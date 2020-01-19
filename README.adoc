@@ -1,0 +1,20 @@
+# Async Tcp Client
+
+A universal asynchronous client for a TCP cluster that provides a strict sequence of sent packets, i.e. the next packet leaves only after receiving a response from the previous one.
+
+If no response to the previous packet is received, then after 5 seconds the previous packet is resent without changes.
+
+Add the Maven dependency:
+
+[source,xml]
+----
+<dependency>
+  <groupId>io.github.sevenparadigms</groupId>
+  <artifactId>async-tcp-client</artifactId>
+  <version>1.0.0</version>
+</dependency>
+----
+
+## Features
+
+The main feature is the activation of sending an event from the database about changing the table through a subscription to the event table.
