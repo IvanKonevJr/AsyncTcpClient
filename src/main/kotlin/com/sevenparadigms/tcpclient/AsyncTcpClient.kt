@@ -81,7 +81,7 @@ abstract class AsyncTcpClient(var hosts: String,
 
     abstract fun getNext(): Mono<List<Any>>
     abstract fun sendNext(entity: Any)
-    abstract fun receive(bytes: ByteArray)
+    abstract fun receive(bytes: ByteArray): Mono<Any>
 
     private fun createClient(): Mono<out Connection> {
         host.set(null)
@@ -92,7 +92,9 @@ abstract class AsyncTcpClient(var hosts: String,
                     .handle { `in`: NettyInbound, out: NettyOutbound ->
                         `in`.receive().asByteArray().doOnNext {
                             debug("received <= [${it.hex()}]")
-                            receive(it)
+                            receive(it).subscribe {
+                                checkAndSend()
+                            }
                         }.subscribe()
                         out.send(Flux.create { sink -> flux.set(sink) })
                     }
