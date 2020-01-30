@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 abstract class AsyncTcpClient(var hosts: String,
                               var repository: R2dbcDslRepository<*, *>) {
 
-    private val delaySeconds = 10L
+    private val delaySeconds = 5L
 
     private val locking = AtomicReference<Boolean>(false)
     private val flux = AtomicReference<FluxSink<ByteBuf?>>()
@@ -37,7 +37,7 @@ abstract class AsyncTcpClient(var hosts: String,
     init {
         init().subscribe {
             Executors.newSingleThreadScheduledExecutor()
-                .scheduleAtFixedRate({ this.checkReceiveTimer() }, delaySeconds * 2, delaySeconds, TimeUnit.SECONDS)
+                .scheduleAtFixedRate({ this.checkReceiveTimer() }, delaySeconds, delaySeconds, TimeUnit.SECONDS)
             repository.listen()
                     .doOnNext { notification ->
                         val json = notification.parameter!!.toString().toJsonNode()
@@ -133,7 +133,9 @@ abstract class AsyncTcpClient(var hosts: String,
         if (counter.get() == 0 || lastPayload.get().hex() == bytes.hex()) {
             lastPayload.set(byteArrayOf())
             info("Found lost connection, attempting connect to next host")
-            createClient().subscribe()
+            createClient().subscribe {
+                forceNext()
+            }
         } else {
             debug("sending(${host.get()}) => [${bytes.hex()}]")
             lastPayload.set(bytes)
