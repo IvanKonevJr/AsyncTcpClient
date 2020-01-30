@@ -15,6 +15,7 @@ import reactor.netty.Connection
 import reactor.netty.NettyInbound
 import reactor.netty.NettyOutbound
 import reactor.netty.tcp.TcpClient
+import java.security.SecureRandom
 import java.time.LocalDateTime
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -54,16 +55,17 @@ abstract class AsyncTcpClient(var hosts: String,
         flux.set(null)
         host.set(null)
         it.set(hosts.split(",").toSet().iterator())
-        timer.set(LocalDateTime.now().plusSeconds(delaySeconds))
         return createClient()
     }
 
     private fun checkReceiveTimer() {
-        if (!locking.get() && LocalDateTime.now().isAfter(timer.get())
-                || locking.get() && LocalDateTime.now().isAfter(timer.get().plusSeconds(delaySeconds))) {
+        if (locking.get() && LocalDateTime.now().isAfter(timer.get())) {
             timer.set(LocalDateTime.now().plusSeconds(delaySeconds))
             locking.set(true)
             checkAndSend()
+        }
+        if (!locking.get() && LocalDateTime.now().isAfter(timer.get().plusSeconds(delaySeconds))) {
+            reconnect()
         }
     }
 
@@ -85,6 +87,8 @@ abstract class AsyncTcpClient(var hosts: String,
 
     private fun createClient(): Mono<out Connection> {
         host.set(null)
+        timer.set(LocalDateTime.now().plusSeconds(delaySeconds))
+        lastPayload.set(byteArrayOf())
         if (it.get().hasNext()) {
             val connection = it.get().next()
             val string = connection.split(":").iterator()
@@ -132,15 +136,21 @@ abstract class AsyncTcpClient(var hosts: String,
         }
         if (counter.get() == 0 || lastPayload.get().hex() == bytes.hex()) {
             lastPayload.set(byteArrayOf())
-            info("Found lost connection, attempting connect to next host")
-            createClient().subscribe {
-                forceNext()
-            }
+            reconnect()
         } else {
             debug("sending(${host.get()}) => [${bytes.hex()}]")
-            lastPayload.set(bytes)
+            val random = ByteArray(512)
+            SecureRandom().nextBytes(random)
+            lastPayload.set(random)
             timer.set(LocalDateTime.now().plusSeconds(delaySeconds))
             flux.get().next(Unpooled.wrappedBuffer(bytes))
+        }
+    }
+
+    private fun reconnect() {
+        info("Found lost connection, attempting connect to next host")
+        createClient().subscribe {
+            forceNext()
         }
     }
 
