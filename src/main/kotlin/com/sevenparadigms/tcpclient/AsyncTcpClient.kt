@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference
 abstract class AsyncTcpClient(var hosts: String,
                               var repository: R2dbcDslRepository<*, *>) {
 
-    private val delaySeconds = 5L
+    private val delaySeconds = 3L
 
     private val locking = AtomicReference<Boolean>(false)
     private val flux = AtomicReference<FluxSink<ByteBuf?>>()
